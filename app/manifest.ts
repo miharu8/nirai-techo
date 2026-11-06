@@ -6,7 +6,7 @@ export default function manifest(): MetadataRoute.Manifest {
     short_name: "ニライ",
     start_url: "/",
     display: "standalone",
-    background_color: "#c9ecef",
+    background_color: "#d6eef0",
     theme_color: "#264e70",
     icons: [{ src: "/icon-512.png", sizes: "512x512", type: "image/png" }],
   };

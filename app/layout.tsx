@@ -3,10 +3,10 @@ import type { Metadata, Viewport } from "next";
 
 export const metadata: Metadata = {
   title: "ニライの手帖",
-  description: "島をめぐり、響きを刻む",
+  description: "海の彼方、ニライの風をたどる",
   appleWebApp: { capable: true, title: "ニライの手帖", statusBarStyle: "default" },
 };
-export const viewport: Viewport = { width: "device-width", initialScale: 1, themeColor: "#c9ecef" };
+export const viewport: Viewport = { width: "device-width", initialScale: 1, themeColor: "#d6eef0" };
 
 export default function RootLayout({ children }: { children: React.ReactNode }) {
   return (

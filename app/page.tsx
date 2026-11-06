@@ -12,6 +12,7 @@ const uid = () => Date.now().toString(36) + Math.random().toString(36).slice(2, 
 const ym = (iso: string) => { const d = new Date(iso); return `${d.getFullYear()}-${d.getMonth() + 1}`; };
 const inp = "w-full p-3 rounded-xl bg-[#fffdf8] border border-[#e3d9c3] text-xs text-[#22384a] placeholder:text-[#7d8c93] focus:outline-none focus:border-[#b08d4a]";
 const card = "bg-[#fffdf8] border border-[#e3d9c3] shadow-sm rounded-xl";
+const LEVELS = ["かすか", "おだやか", "澄む", "満ちる", "輝く"]; // 波動（弱 → 強）
 const CATS: Record<string, string> = { gourmet: "味わい", rental_car: "足（移動）", stay: "宿り", spot: "訪ねたい場所", other: "その他" };
 
 // 旅のタイトル・メモの言葉に合わせて持ち物を自動追加
@@ -53,14 +54,15 @@ function MapView({ logs }: { logs: Log[] }) {
     const ll = pts.map((p) => [Number(p.lat), Number(p.lon)]);
     L.polyline(ll, { color: "#2f7f8a", weight: 3, dashArray: "6 6" }).addTo(map);
     pts.forEach((p, i) => {
+      const sz = 20 + p.score * 3;
       const bg = p.type === "work" ? "#c9604b" : "#2f7f8a";
       const icon = L.divIcon({
         className: "",
-        html: `<div style="width:26px;height:26px;border-radius:50%;background:${bg};color:#fff;font-size:12px;font-weight:bold;display:flex;align-items:center;justify-content:center;border:2px solid #fff;box-shadow:0 1px 4px rgba(0,0,0,.4)">${i + 1}</div>`,
-        iconSize: [26, 26], iconAnchor: [13, 13],
+        html: `<div style="width:${sz}px;height:${sz}px;border-radius:50%;background:${bg};color:#fff;font-size:${Math.round(sz / 2)}px;font-weight:bold;display:flex;align-items:center;justify-content:center;border:2px solid #fff;box-shadow:0 1px 4px rgba(0,0,0,.4)">${p.score}</div>`,
+        iconSize: [sz, sz], iconAnchor: [sz / 2, sz / 2],
       });
-      const label = (p.type === "work" ? "ご縁" : "土地") + (p.client ? ` ${esc(p.client)}様` : "") + ` ★${p.score}`;
-      L.marker(ll[i], { icon }).addTo(map).bindPopup(`<b>${i + 1}. ${label}</b><br>${new Date(p.at).toLocaleString("ja-JP")}${p.memo ? "<br>" + esc(p.memo) : ""}`);
+      const label = (p.type === "work" ? "ご縁" : "土地") + (p.client ? ` ${esc(p.client)}様` : "") + ` 波動 ${p.score}（${LEVELS[p.score - 1]}）`;
+      L.marker(ll[i], { icon }).addTo(map).bindPopup(`<b>${label}</b><br>${i + 1}番目の記録<br>${new Date(p.at).toLocaleString("ja-JP")}${p.memo ? "<br>" + esc(p.memo) : ""}`);
     });
     map.fitBounds(ll, { padding: [30, 30], maxZoom: 15 });
     return () => map.remove();
@@ -70,7 +72,7 @@ function MapView({ logs }: { logs: Log[] }) {
     <div className="space-y-3">
       <div className="flex gap-2 text-[11px]">
         {([["all", "すべて"], ["land", "土地"], ["work", "ご縁"]] as const).map(([k, l]) => (
-          <button key={k} onClick={() => setFilter(k)} className={`px-3 py-1.5 rounded-lg ${filter === k ? "bg-[#264e70] text-white" : "bg-[#efe8d8] text-[#4e6472]"}`}>{l}</button>
+          <button key={k} onClick={() => setFilter(k)} className={`px-3 py-1.5 rounded-lg ${filter === k ? "bg-[#264e70] text-white" : "bg-[#f3f9f9] text-[#4e6472]"}`}>{l}</button>
         ))}
         <span className="ml-auto text-[#7d8c93] self-center">{pts.length}か所</span>
       </div>
@@ -79,7 +81,7 @@ function MapView({ logs }: { logs: Log[] }) {
       ) : (
         <>
           <div ref={ref} className="isolate relative z-0 h-[60vh] w-full rounded-xl border border-[#e3d9c3]" />
-          <p className="text-[10px] text-[#7d8c93]">番号は刻んだ順です。点に触れると記憶がひらきます。（海の色＝土地／珊瑚色＝ご縁）</p>
+          <p className="text-[10px] text-[#7d8c93]">点の数字は波動の強さ（1＝かすか 〜 5＝輝く）で、大きいほど強い波動です。線は刻んだ順につながっています。点に触れると記憶がひらきます。（海の色＝土地／珊瑚色＝ご縁）</p>
         </>
       )}
     </div>
@@ -155,7 +157,7 @@ export default function SeekerApp() {
     };
     setLogs((p) => [log, ...p]);
     setMemo(""); setClient(""); setFee("");
-    flash(pos ? "響きを刻みました（場所つき）" : "響きを刻みました");
+    flash(pos ? "波動を刻みました（場所つき）" : "波動を刻みました");
   };
   const handleLog = () => {
     if (!navigator.geolocation) return saveLog();
@@ -224,12 +226,12 @@ export default function SeekerApp() {
   const btn = (on: boolean) => `py-3 rounded-xl text-xs font-medium border transition-all ${on ? "bg-[#e8eef2] border-[#264e70] text-[#264e70]" : "bg-[#fffdf8] border-transparent text-[#4e6472]"}`;
 
   return (
-    <div style={{ fontFamily: '"Hiragino Mincho ProN","Yu Mincho","Noto Serif JP",serif' }} className="max-w-md mx-auto min-h-screen bg-[#c9ecef] text-[#22384a] p-5 pb-28 antialiased">
+    <div style={{ fontFamily: '"Hiragino Mincho ProN","Yu Mincho","Noto Serif JP",serif' }} className="min-h-screen bg-[#d6eef0] text-[#22384a] antialiased"><div className="max-w-md mx-auto p-5 pb-28">
       <div className="text-center pb-5">
         <div className="h-1 rounded-full bg-gradient-to-r from-[#264e70] via-[#b08d4a] to-[#c9604b] mb-4" />
         <p className="text-[#b08d4a] text-xs tracking-[0.5em]">〜 ❖ 〜</p>
         <h1 className="text-2xl font-medium tracking-[0.25em] text-[#264e70] mt-1">ニライの手帖</h1>
-        <p className="text-[11px] text-[#4e6472] mt-1 tracking-widest">島をめぐり、響きを刻む</p>
+        <p className="text-[11px] text-[#4e6472] mt-1 tracking-widest">海の彼方、ニライの風をたどる</p>
       </div>
 
       {/* ===== 記録 ===== */}
@@ -239,10 +241,10 @@ export default function SeekerApp() {
             <button onClick={() => setType("land")} className={btn(type === "land")}>土地との対話</button>
             <button onClick={() => setType("work")} className={btn(type === "work")}>ご縁のセッション</button>
           </div>
-          <p className="text-[11px] text-[#4e6472] -mb-2">場の響き　弱 ← → 強</p>
+          <p className="text-[11px] text-[#4e6472]">この場の波動は、どんな感じ？</p>
           <div className="flex gap-2">
             {[1, 2, 3, 4, 5].map((s) => (
-              <button key={s} onClick={() => setScore(s)} className={`flex-1 py-3 rounded-xl font-bold ${score === s ? "bg-[#264e70] text-white" : "bg-[#efe8d8] text-[#7d8c93]"}`}>{s}</button>
+              <button key={s} onClick={() => setScore(s)} className={`flex-1 py-2.5 rounded-xl ${score === s ? "bg-[#264e70] text-white" : "bg-[#f3f9f9] text-[#7d8c93]"}`}><span className="block text-base font-bold leading-none">{s}</span><span className="block text-[9px] mt-1 opacity-80">{LEVELS[s - 1]}</span></button>
             ))}
           </div>
           {type === "work" && (
@@ -252,7 +254,7 @@ export default function SeekerApp() {
             </div>
           )}
           <textarea className={`${inp} h-20 resize-none`} placeholder="感じたこと、風や香り、場所の名前、気づき…" value={memo} onChange={(e) => setMemo(e.target.value)} />
-          <button onClick={handleLog} className="w-full py-4 bg-gradient-to-r from-[#264e70] to-[#2f7f8a] rounded-xl font-medium tracking-widest text-sm text-white">この場の響きを刻む</button>
+          <button onClick={handleLog} className="w-full py-4 bg-gradient-to-r from-[#264e70] to-[#2f7f8a] rounded-xl font-medium tracking-widest text-sm text-white">この場の波動を刻む</button>
 
           {monthWork.length > 0 && (
             <div className={`${card} p-3 text-xs flex justify-between`}>
@@ -263,7 +265,7 @@ export default function SeekerApp() {
 
           <div className="flex gap-2 text-[11px]">
             {([["all", "すべて"], ["land", "土地"], ["work", "ご縁"]] as const).map(([k, l]) => (
-              <button key={k} onClick={() => setFilter(k)} className={`px-3 py-1.5 rounded-lg ${filter === k ? "bg-[#264e70] text-white" : "bg-[#efe8d8] text-[#4e6472]"}`}>{l}</button>
+              <button key={k} onClick={() => setFilter(k)} className={`px-3 py-1.5 rounded-lg ${filter === k ? "bg-[#264e70] text-white" : "bg-[#f3f9f9] text-[#4e6472]"}`}>{l}</button>
             ))}
             <span className="ml-auto text-[#7d8c93] self-center">{shown.length}件</span>
           </div>
@@ -278,7 +280,7 @@ export default function SeekerApp() {
                     {l.fee > 0 && <span className="text-[#4e6472] ml-2">{l.fee.toLocaleString()}円</span>}
                     <p className="text-[10px] text-[#4e6472] mt-0.5">{new Date(l.at).toLocaleString("ja-JP")}</p>
                   </div>
-                  <span className="bg-[#efe8d8] px-2.5 py-1 rounded-lg font-bold text-[#264e70]">★ {l.score}</span>
+                  <span className="bg-[#f3f9f9] px-2.5 py-1 rounded-lg font-bold text-[#264e70]">{l.score}・{LEVELS[l.score - 1]}</span>
                 </div>
                 {l.memo && <p className="text-[#22384a] mt-2 whitespace-pre-wrap">{l.memo}</p>}
                 <div className="flex justify-between mt-2 text-[10px]">
@@ -305,7 +307,7 @@ export default function SeekerApp() {
           {trips.length > 0 && (
             <div className="flex gap-2 overflow-x-auto pb-1">
               {trips.map((t) => (
-                <button key={t.id} onClick={() => setCurrentId(t.id)} className={`shrink-0 px-3 py-2 rounded-lg text-xs ${t.id === currentId ? "bg-[#264e70] text-white" : "bg-[#efe8d8] text-[#4e6472]"}`}>{t.title}</button>
+                <button key={t.id} onClick={() => setCurrentId(t.id)} className={`shrink-0 px-3 py-2 rounded-lg text-xs ${t.id === currentId ? "bg-[#264e70] text-white" : "bg-[#f3f9f9] text-[#4e6472]"}`}>{t.title}</button>
               ))}
             </div>
           )}
@@ -315,7 +317,7 @@ export default function SeekerApp() {
               <div className="p-4 bg-[#e8eef2] border border-[#b9c9d4] rounded-xl">
                 <h3 className="font-bold text-sm text-[#264e70]">{trip.title}</h3>
                 {trip.date && <p className="text-[11px] text-[#4e6472] mt-0.5">{trip.date.replace(/-/g, "/")}</p>}
-                <textarea className="w-full mt-2 p-2 rounded-lg bg-[#efe8d8] text-xs text-[#22384a] h-20 resize-none focus:outline-none" placeholder="予約メモ" value={trip.notes} onChange={(e) => updateTrip((t) => ({ ...t, notes: e.target.value }))} />
+                <textarea className="w-full mt-2 p-2 rounded-lg bg-[#f3f9f9] text-xs text-[#22384a] h-20 resize-none focus:outline-none" placeholder="予約メモ" value={trip.notes} onChange={(e) => updateTrip((t) => ({ ...t, notes: e.target.value }))} />
               </div>
 
               <div className="flex justify-between items-center text-[11px] text-[#4e6472]">
@@ -358,7 +360,7 @@ export default function SeekerApp() {
           {favs.map((f) => (
             <div key={f.id} className={`${card} p-4`}>
               <div className="flex justify-between">
-                <span className="text-[10px] px-2 py-0.5 rounded-full font-bold bg-[#efe8d8] text-[#264e70]">{CATS[f.category] ?? "その他"}</span>
+                <span className="text-[10px] px-2 py-0.5 rounded-full font-bold bg-[#f3f9f9] text-[#264e70]">{CATS[f.category] ?? "その他"}</span>
                 <button onClick={() => confirm("削除しますか？") && setFavs((p) => p.filter((x) => x.id !== f.id))} className="text-[#7d8c93] text-xs">削除</button>
               </div>
               <h3 className="font-bold text-xs mt-1 text-[#22384a]">{f.name}</h3>
@@ -385,13 +387,13 @@ export default function SeekerApp() {
 
       {msg && <div className="fixed bottom-24 z-50 left-1/2 -translate-x-1/2 w-[90%] max-w-sm text-center text-xs text-[#264e70] bg-[#fffdf8] shadow-md py-2.5 rounded-xl border border-[#b9c9d4]">{msg}</div>}
 
-      <div className="fixed bottom-0 z-50 left-1/2 -translate-x-1/2 w-full max-w-md p-3 bg-[#c9ecef]">
+      <div className="fixed bottom-0 z-50 left-1/2 -translate-x-1/2 w-full max-w-md p-3 bg-[#d6eef0]">
         <div className="grid grid-cols-5 gap-1 bg-[#fffdf8] p-1.5 rounded-2xl border border-[#e3d9c3]">
           {tabs.map(([k, l]) => (
             <button key={k} onClick={() => setTab(k)} className={`py-3 rounded-xl text-[11px] font-medium ${tab === k ? "bg-[#264e70] text-white" : "text-[#4e6472]"}`}>{l}</button>
           ))}
         </div>
       </div>
-    </div>
+    </div></div>
   );
 }
