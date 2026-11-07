@@ -7,6 +7,8 @@ type Item = { id: string; name: string; packed: boolean; cat?: string };
 type Plan = { id: string; name: string; kind: string; day: string; memo: string; done: boolean };
 type Trip = { id: string; title: string; start: string; end: string; notes: string; items: Item[]; plans: Plan[]; date?: string };
 type Fav = { id: string; name: string; category: string; area: string; memo: string };
+type Profile = { title: string; name: string; romaji: string; message: string; url: string };
+const DEFAULT_PROFILE: Profile = { title: "波動調整師", name: "千鈴龍穂", romaji: "senritatuho", message: "島と土地の波動に耳をすませ、ご縁をつないでいく旅の手帖です。", url: "" };
 
 const KEY = "seeker_data_v2";
 const uid = () => Date.now().toString(36) + Math.random().toString(36).slice(2, 6);
@@ -51,6 +53,20 @@ function makeItems(text: string, live: boolean): Item[] {
 
 const ESC: Record<string, string> = { "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" };
 const esc = (t: string) => t.replace(/[&<>"']/g, (c) => ESC[c]);
+const toLocalInput = (s: string) => { const d = new Date(s); return `${iso(d)}T${String(d.getHours()).padStart(2, "0")}:${String(d.getMinutes()).padStart(2, "0")}`; };
+
+// 落款（朱の印）：お名前の最初の4文字を、右から左へ縦書き風に並べます
+function Seal({ name, size = 36 }: { name: string; size?: number }) {
+  const c = Array.from(name.replace(/\s/g, "")).slice(0, 4);
+  const cols = [c.slice(0, 2), c.slice(2, 4)].filter((x) => x.length);
+  return (
+    <div style={{ width: size, height: size, fontSize: Math.round(size * 0.34) }} className="shrink-0 bg-[#c9453f] text-white font-bold rounded-[4px] flex flex-row-reverse items-center justify-center gap-[2px] shadow-sm ring-1 ring-[#c9453f]/30">
+      {cols.map((col, i) => (
+        <div key={i} className="flex flex-col items-center justify-center leading-none gap-[1px]">{col.map((ch, j) => <span key={j}>{ch}</span>)}</div>
+      ))}
+    </div>
+  );
+}
 const mapUrl = (q: string) => `https://www.google.com/maps/search/?api=1&query=${encodeURIComponent(q)}`;
 
 // 地図：波動1〜5で色分け。丸＝土地、角丸の四角＝ご縁。線は記録順。
@@ -132,6 +148,12 @@ export default function SeekerApp() {
     { id: "f2", name: "お気に入りの蕎麦屋", category: "gourmet", area: "", memo: "鴨南蛮が絶品。エネルギーが高い空間" },
   ]);
   const [msg, setMsg] = useState("");
+  const [profile, setProfile] = useState<Profile>(DEFAULT_PROFILE);
+  const [editProfile, setEditProfile] = useState(false);
+  const [editLogId, setEditLogId] = useState("");
+  const [editPlanId, setEditPlanId] = useState("");
+  const [editItemId, setEditItemId] = useState("");
+  const [editFavId, setEditFavId] = useState("");
 
   // 記録
   const [type, setType] = useState<"land" | "work">("land");
@@ -170,6 +192,7 @@ export default function SeekerApp() {
         const d = JSON.parse(raw);
         setLogs(d.logs ?? []); setTrips((d.trips ?? []).map(normTrip)); setCurrentId(d.currentId ?? "");
         if (d.favs) setFavs(d.favs.map((f: any) => ({ ...f, area: f.area ?? "" })));
+        if (d.profile) setProfile({ ...DEFAULT_PROFILE, ...d.profile });
       } else {
         const oldLogs = JSON.parse(localStorage.getItem("seeker_logs") || "[]");
         setLogs(oldLogs.map((l: any) => ({
@@ -182,8 +205,8 @@ export default function SeekerApp() {
   }, []);
 
   useEffect(() => {
-    if (loaded) localStorage.setItem(KEY, JSON.stringify({ logs, trips, currentId, favs }));
-  }, [logs, trips, currentId, favs, loaded]);
+    if (loaded) localStorage.setItem(KEY, JSON.stringify({ logs, trips, currentId, favs, profile }));
+  }, [logs, trips, currentId, favs, profile, loaded]);
 
   // ---- 記録 ----
   const saveLog = (pos?: GeolocationPosition) => {
@@ -201,6 +224,8 @@ export default function SeekerApp() {
     flash("場所を探しています…");
     navigator.geolocation.getCurrentPosition(saveLog, () => saveLog(), { timeout: 10000 });
   };
+  const updateLog = (id: string, patch: Partial<Log>) => setLogs((p) => p.map((l) => (l.id === id ? { ...l, ...patch } : l)));
+  const updateFav = (id: string, patch: Partial<Fav>) => setFavs((p) => p.map((f) => (f.id === id ? { ...f, ...patch } : f)));
   const delLog = (id: string) => { if (confirm("この記録を削除しますか？")) setLogs((p) => p.filter((l) => l.id !== id)); };
 
   const thisMonth = ym(new Date().toISOString());
@@ -235,6 +260,7 @@ export default function SeekerApp() {
     setPName(""); setPMemo("");
   };
   const updatePlan = (id: string, patch: Partial<Plan>) => updateTrip((t) => ({ ...t, plans: t.plans.map((p) => (p.id === id ? { ...p, ...patch } : p)) }));
+  const updateItem = (id: string, patch: Partial<Item>) => updateTrip((t) => ({ ...t, items: t.items.map((x) => (x.id === id ? { ...x, ...patch } : x)) }));
   const plansOf = (d: string) => (trip?.plans ?? []).filter((p) => (d === "" ? !days.includes(p.day) : p.day === d));
 
   // ---- とっておき ----
@@ -255,7 +281,7 @@ export default function SeekerApp() {
 
   // ---- お守り ----
   const exportData = () => {
-    const blob = new Blob([JSON.stringify({ logs, trips, currentId, favs }, null, 2)], { type: "application/json" });
+    const blob = new Blob([JSON.stringify({ logs, trips, currentId, favs, profile }, null, 2)], { type: "application/json" });
     const a = document.createElement("a");
     a.href = URL.createObjectURL(blob);
     a.download = `seeker-backup-${new Date().toISOString().slice(0, 10)}.json`;
@@ -271,6 +297,7 @@ export default function SeekerApp() {
         if (!confirm("今のデータをバックアップの内容に置き換えます。よろしいですか？")) return;
         setLogs(d.logs ?? []); setTrips((d.trips ?? []).map(normTrip)); setCurrentId(d.currentId ?? "");
         setFavs((d.favs ?? []).map((f: any) => ({ ...f, area: f.area ?? "" })));
+        if (d.profile) setProfile({ ...DEFAULT_PROFILE, ...d.profile });
         flash("お守りから戻しました");
       } catch { flash("ファイルを読み込めませんでした"); }
     };
@@ -290,6 +317,14 @@ export default function SeekerApp() {
           <p className="text-[#b08d4a] text-xs tracking-[0.5em]">〜 ❖ 〜</p>
           <h1 className="text-2xl font-medium tracking-[0.25em] text-[#264e70] mt-1">ニライの手帖</h1>
           <p className="text-[11px] text-[#4e6472] mt-1 tracking-widest">海の彼方、ニライの風をたどる</p>
+          <div className="flex items-center justify-center gap-3 mt-4">
+            <Seal name={profile.name} size={40} />
+            <div className="text-left leading-tight">
+              <p className="text-[10px] text-[#4e6472] tracking-[0.3em]">{profile.title}</p>
+              <p className="text-sm font-medium tracking-[0.25em]">{profile.name}<span className="text-[10px] text-[#4e6472] tracking-widest ml-1.5">作</span></p>
+              <p className="text-[9px] text-[#7d8c93] tracking-[0.3em]">{profile.romaji}</p>
+            </div>
+          </div>
         </div>
 
         {/* ===== 刻む ===== */}
@@ -334,6 +369,30 @@ export default function SeekerApp() {
               {shown.length === 0 && <p className="text-xs text-[#4e6472] text-center py-6">まだ何も刻まれていません</p>}
               {shown.map((l) => (
                 <div key={l.id} className={`${card} p-3 text-xs`}>
+                  {editLogId === l.id ? (
+                    <div className="space-y-2">
+                      <div className="grid grid-cols-2 gap-2">
+                        <button onClick={() => updateLog(l.id, { type: "land" })} className={btn(l.type === "land")}>土地との対話</button>
+                        <button onClick={() => updateLog(l.id, { type: "work" })} className={btn(l.type === "work")}>ご縁のセッション</button>
+                      </div>
+                      <div className="flex gap-1.5">
+                        {[1, 2, 3, 4, 5].map((n) => (
+                          <button key={n} onClick={() => updateLog(l.id, { score: n })} style={l.score === n ? { background: LV_COLORS[n - 1] } : {}} className={`flex-1 py-2 rounded-lg ${l.score === n ? "text-white" : "bg-[#f3f9f9] text-[#4e6472]"}`}>
+                            <span className="block text-sm font-bold leading-none">{n}</span><span className="block text-[9px] mt-0.5">{LEVELS[n - 1]}</span>
+                          </button>
+                        ))}
+                      </div>
+                      {l.type === "work" && (
+                        <div className="grid grid-cols-2 gap-2">
+                          <input className={inp} placeholder="お客様のお名前" value={l.client} onChange={(e) => updateLog(l.id, { client: e.target.value })} />
+                          <input className={inp} placeholder="料金（円）" inputMode="numeric" value={l.fee ? String(l.fee) : ""} onChange={(e) => updateLog(l.id, { fee: Number(e.target.value.replace(/\D/g, "")) || 0 })} />
+                        </div>
+                      )}
+                      <input type="datetime-local" className={`${inp} appearance-none`} value={toLocalInput(l.at)} onChange={(e) => e.target.value && updateLog(l.id, { at: new Date(e.target.value).toISOString() })} />
+                      <textarea className={`${inp} h-20 resize-none`} value={l.memo} onChange={(e) => updateLog(l.id, { memo: e.target.value })} />
+                      <button onClick={() => setEditLogId("")} className="w-full py-2 bg-[#264e70] rounded-xl text-xs font-bold text-white">完了</button>
+                    </div>
+                  ) : (<>
                   <div className="flex justify-between items-start">
                     <div>
                       <span className="text-[#264e70] font-medium">{l.type === "work" ? "ご縁" : "土地"}</span>
@@ -346,8 +405,9 @@ export default function SeekerApp() {
                   {l.memo && <p className="mt-2 whitespace-pre-wrap">{l.memo}</p>}
                   <div className="flex justify-between mt-2 text-[10px]">
                     {l.lat ? <a className="text-[#264e70] underline" href={`https://www.google.com/maps?q=${l.lat},${l.lon}`} target="_blank" rel="noreferrer">地図でひらく</a> : <span className="text-[#7d8c93]">場所の記録なし</span>}
-                    <button onClick={() => delLog(l.id)} className="text-[#7d8c93]">削除</button>
+                    <span className="flex gap-3"><button onClick={() => setEditLogId(l.id)} className="text-[#264e70]">編集</button><button onClick={() => delLog(l.id)} className="text-[#7d8c93]">削除</button></span>
                   </div>
+                  </>)}
                 </div>
               ))}
             </div>
@@ -388,7 +448,7 @@ export default function SeekerApp() {
             {trip && (
               <div className="space-y-4">
                 <div className="p-4 bg-[#e8eef2] border border-[#b9c9d4] rounded-xl space-y-2">
-                  <h3 className="font-bold text-sm text-[#264e70]">{trip.title}</h3>
+                  <input className={`${inp} font-bold`} value={trip.title} onChange={(e) => updateTrip((t) => ({ ...t, title: e.target.value }))} />
                   {rangeText(trip) && <p className="text-[11px] text-[#4e6472]">{rangeText(trip)}（{days.length}日間）</p>}
                   <div className="grid grid-cols-2 gap-2">
                     <input type="date" className={`${inp} appearance-none`} value={trip.start} onChange={(e) => updateTrip((t) => ({ ...t, start: e.target.value, end: t.end && t.end < e.target.value ? "" : t.end }))} />
@@ -424,11 +484,20 @@ export default function SeekerApp() {
                           <div key={p.id} className={`${card} p-3 space-y-1.5`}>
                             <div className="flex items-center gap-2">
                               <input type="checkbox" checked={p.done} onChange={() => updatePlan(p.id, { done: !p.done })} className="w-4 h-4 accent-[#264e70]" />
-                              <span className={`flex-1 text-xs font-medium ${p.done ? "line-through text-[#7d8c93]" : ""}`}>{p.name}</span>
+                              {editPlanId === p.id
+                                ? <input className={inp} value={p.name} onChange={(e) => updatePlan(p.id, { name: e.target.value })} />
+                                : <span className={`flex-1 text-xs font-medium ${p.done ? "line-through text-[#7d8c93]" : ""}`}>{p.name}</span>}
                               <span className={tag}>{CATS[p.kind] ?? "その他"}</span>
+                              <button onClick={() => setEditPlanId(editPlanId === p.id ? "" : p.id)} className="text-[#264e70] text-xs">✎</button>
                               <button onClick={() => updateTrip((t) => ({ ...t, plans: t.plans.filter((x) => x.id !== p.id) }))} className="text-[#7d8c93] text-xs">✕</button>
                             </div>
-                            {p.memo && <p className="text-[11px] text-[#4e6472] pl-6">{p.memo}</p>}
+                            {editPlanId === p.id ? (
+                              <div className="space-y-2 pl-6">
+                                <select className={inp} value={p.kind} onChange={(e) => updatePlan(p.id, { kind: e.target.value })}>{Object.entries(CATS).map(([k, v]) => <option key={k} value={k}>{v}</option>)}</select>
+                                <input className={inp} placeholder="メモ" value={p.memo} onChange={(e) => updatePlan(p.id, { memo: e.target.value })} />
+                                <button onClick={() => setEditPlanId("")} className="w-full py-2 bg-[#264e70] rounded-xl text-xs font-bold text-white">完了</button>
+                              </div>
+                            ) : (p.memo && <p className="text-[11px] text-[#4e6472] pl-6">{p.memo}</p>)}
                             <div className="flex justify-between items-center pl-6 text-[10px]">
                               <a className="text-[#264e70] underline" href={mapUrl(p.name)} target="_blank" rel="noreferrer">地図でひらく</a>
                               <select className="bg-[#f3f9f9] rounded-lg px-2 py-1 text-[#4e6472]" value={days.includes(p.day) ? p.day : ""} onChange={(e) => updatePlan(p.id, { day: e.target.value })}>
@@ -459,7 +528,13 @@ export default function SeekerApp() {
                         {list.map((i) => (
                           <div key={i.id} className={`${card} p-3 flex items-center gap-3`}>
                             <input type="checkbox" checked={i.packed} onChange={() => updateTrip((t) => ({ ...t, items: t.items.map((x) => (x.id === i.id ? { ...x, packed: !x.packed } : x)) }))} className="w-4 h-4 accent-[#264e70]" />
-                            <span className={`flex-1 text-xs ${i.packed ? "line-through text-[#7d8c93]" : ""}`}>{i.name}</span>
+                            {editItemId === i.id ? (
+                              <div className="flex-1 flex gap-1.5 min-w-0">
+                                <input className={inp} value={i.name} onChange={(e) => updateItem(i.id, { name: e.target.value })} />
+                                <select className={`${inp} !w-24 shrink-0`} value={i.cat ?? "その他"} onChange={(e) => updateItem(i.id, { cat: e.target.value })}>{ITEM_CATS.map((c) => <option key={c}>{c}</option>)}</select>
+                              </div>
+                            ) : <span className={`flex-1 text-xs ${i.packed ? "line-through text-[#7d8c93]" : ""}`}>{i.name}</span>}
+                            <button onClick={() => setEditItemId(editItemId === i.id ? "" : i.id)} className="text-[#264e70] text-xs">{editItemId === i.id ? "完了" : "✎"}</button>
                             <button onClick={() => updateTrip((t) => ({ ...t, items: t.items.filter((x) => x.id !== i.id) }))} className="text-[#7d8c93] text-xs">✕</button>
                           </div>
                         ))}
@@ -511,11 +586,24 @@ export default function SeekerApp() {
                   </div>
                   <button onClick={() => confirm("削除しますか？") && setFavs((p) => p.filter((x) => x.id !== f.id))} className="text-[#7d8c93] text-xs">削除</button>
                 </div>
-                <h3 className="font-bold text-xs mt-1.5">{f.name}</h3>
-                {f.memo && <p className="text-xs text-[#4e6472] mt-1">{f.memo}</p>}
+                {editFavId === f.id ? (
+                  <div className="space-y-2 mt-2">
+                    <input className={inp} value={f.name} onChange={(e) => updateFav(f.id, { name: e.target.value })} />
+                    <div className="grid grid-cols-2 gap-2">
+                      <input className={inp} list="areas" placeholder="エリア" value={f.area} onChange={(e) => updateFav(f.id, { area: e.target.value })} />
+                      <select className={inp} value={f.category} onChange={(e) => updateFav(f.id, { category: e.target.value })}>{Object.entries(CATS).map(([k, v]) => <option key={k} value={k}>{v}</option>)}</select>
+                    </div>
+                    <input className={inp} placeholder="ひとことメモ" value={f.memo} onChange={(e) => updateFav(f.id, { memo: e.target.value })} />
+                    <button onClick={() => setEditFavId("")} className="w-full py-2 bg-[#264e70] rounded-xl text-xs font-bold text-white">完了</button>
+                  </div>
+                ) : (<>
+                  <h3 className="font-bold text-xs mt-1.5">{f.name}</h3>
+                  {f.memo && <p className="text-xs text-[#4e6472] mt-1">{f.memo}</p>}
+                </>)}
                 <div className="flex gap-4 mt-2 text-[11px]">
                   <a className="text-[#264e70] underline" href={mapUrl(`${f.area} ${f.name}`.trim())} target="_blank" rel="noreferrer">地図でひらく</a>
                   <button className="text-[#264e70] underline" onClick={() => favToTrip(f)}>今の旅に入れる</button>
+                  <button className="text-[#264e70] underline" onClick={() => setEditFavId(editFavId === f.id ? "" : f.id)}>編集</button>
                 </div>
               </div>
             ))}
@@ -527,6 +615,32 @@ export default function SeekerApp() {
         {tab === "data" && (
           <div className="space-y-4 text-xs">
             <div className={`${card} p-4 space-y-3`}>
+              <div className="flex items-center gap-3">
+                <Seal name={profile.name} size={44} />
+                <div>
+                  <p className="text-[10px] text-[#4e6472] tracking-[0.3em]">{profile.title}</p>
+                  <p className="font-bold text-sm tracking-[0.2em]">{profile.name}</p>
+                  <p className="text-[10px] text-[#7d8c93] tracking-[0.25em]">{profile.romaji}</p>
+                </div>
+              </div>
+              {editProfile ? (
+                <div className="space-y-2">
+                  <input className={inp} placeholder="肩書き" value={profile.title} onChange={(e) => setProfile({ ...profile, title: e.target.value })} />
+                  <input className={inp} placeholder="お名前" value={profile.name} onChange={(e) => setProfile({ ...profile, name: e.target.value })} />
+                  <input className={inp} placeholder="ローマ字" value={profile.romaji} onChange={(e) => setProfile({ ...profile, romaji: e.target.value })} />
+                  <textarea className={`${inp} h-20 resize-none`} placeholder="ひとこと" value={profile.message} onChange={(e) => setProfile({ ...profile, message: e.target.value })} />
+                  <input className={inp} placeholder="公式サイトやSNSのURL（https://…）" value={profile.url} onChange={(e) => setProfile({ ...profile, url: e.target.value })} />
+                  <button onClick={() => setEditProfile(false)} className="w-full py-2 bg-[#264e70] rounded-xl font-bold text-white">完了</button>
+                </div>
+              ) : (
+                <>
+                  <p className="text-[#4e6472] whitespace-pre-wrap">{profile.message}</p>
+                  {/^https?:\/\//.test(profile.url) && <a className="text-[#264e70] underline block" href={profile.url} target="_blank" rel="noreferrer">公式サイト・SNSをひらく</a>}
+                  <button onClick={() => setEditProfile(true)} className="text-[#264e70] underline">プロフィールを編集</button>
+                </>
+              )}
+            </div>
+            <div className={`${card} p-4 space-y-3`}>
               <p className="font-bold">お守りを作る</p>
               <p className="text-[#4e6472]">記憶はこのスマホの中だけに保存されています。大切な記憶が消えないよう、ときどきお守り（バックアップ）を作っておきましょう。機種変更のときにも使えます。</p>
               <button onClick={exportData} className="w-full py-2.5 bg-[#264e70] rounded-xl font-bold text-white">お守りを保存する</button>
@@ -537,6 +651,8 @@ export default function SeekerApp() {
             </div>
           </div>
         )}
+
+        <p className="text-center text-[10px] text-[#4e6472] mt-8 tracking-widest">ニライの手帖　／　{profile.title}　{profile.name}　作</p>
 
         {msg && <div className="fixed bottom-24 z-50 left-1/2 -translate-x-1/2 w-[90%] max-w-sm text-center text-xs text-[#264e70] bg-[#fffdf8] shadow-md py-2.5 rounded-xl border border-[#b9c9d4]">{msg}</div>}
 
