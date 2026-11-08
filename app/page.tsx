@@ -9,7 +9,7 @@ type Trip = { id: string; title: string; start: string; end: string; notes: stri
 type Fav = { id: string; name: string; category: string; area: string; memo: string; loc?: string };
 type Place = { key: string; name: string; named: boolean; logs: Log[]; lat: string; lon: string; last: Log; memo: string };
 
-const APP_VERSION = "2026.11.08-c";
+const APP_VERSION = "2026.11.08-d";
 const KEY = "seeker_data_v2";
 const uid = () => Date.now().toString(36) + Math.random().toString(36).slice(2, 6);
 const ym = (iso: string) => { const d = new Date(iso); return `${d.getFullYear()}-${d.getMonth() + 1}`; };
@@ -390,8 +390,15 @@ export default function SeekerApp() {
           <div className="relative pt-1">
             <Mark width={190} />
             <h1 className="text-xl font-medium tracking-[0.3em] mt-1 mr-[-0.3em]">ニライの手帖</h1>
-            <p className="text-[11px] text-[#5f7078] mt-1 tracking-[0.2em]">天・地・人を、風がつなぐ</p>
-            <p className="text-[10px] text-[#8a99a0] mt-2 tracking-[0.2em]">千鈴龍穂の教えとともに</p>
+            <p className="text-[11px] text-[#5f7078] mt-1 tracking-[0.2em]">天・地・人を風がつなぐ</p>
+            <div className="mt-3 flex items-center justify-center gap-2.5 text-center">
+              <span className="h-px w-7 bg-[#c9a77c]/70" />
+              <div className="leading-tight">
+                <p className="text-[9px] italic tracking-[0.35em] text-[#8a99a0]">Presented by</p>
+                <p className="text-[11px] tracking-[0.3em] mr-[-0.3em] text-[#5f7078]">波動調整師　千鈴龍穂</p>
+              </div>
+              <span className="h-px w-7 bg-[#c9a77c]/70" />
+            </div>
           </div>
         </div>
 
@@ -747,7 +754,7 @@ export default function SeekerApp() {
                 <div><p className="text-[#e29a86] font-bold text-sm">人</p><p>千の鈴</p></div>
               </div>
               <p className="text-[#5f7078] leading-relaxed">ひとりひとりの鈴の音が、天と地をつなぐ。天地人のように、天と地、海、植物、鉱物、岩などの自然をつなぐ役割として、日々の波動調整を刻む手帖です。</p>
-              <p className="text-[10px] text-[#8a99a0] text-center tracking-widest">波動調整師 千鈴龍穂（senritatuho）の教えとともに</p>
+              <p className="text-[10px] text-[#8a99a0] text-center tracking-widest">Presented by 波動調整師 千鈴龍穂（senritatuho）</p>
             </div>
             <div className={`${card} p-4 space-y-3`}>
               <p className="font-bold">お守りを作る</p>

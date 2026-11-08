@@ -1,7 +1,7 @@
 import "./globals.css";
 import type { Metadata, Viewport } from "next";
 
-const desc = "天・地・人を、風がつなぐ。波動調整師のための、日々の波動調整を刻む手帖。千鈴龍穂の教えとともに。";
+const desc = "天・地・人を風がつなぐ。波動調整師のための、日々の波動調整を刻む手帖。Presented by 波動調整師 千鈴龍穂。";
 
 export const metadata: Metadata = {
   title: "ニライの手帖",
