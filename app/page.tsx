@@ -9,7 +9,7 @@ type Trip = { id: string; title: string; start: string; end: string; notes: stri
 type Fav = { id: string; name: string; category: string; area: string; memo: string; loc?: string };
 type Place = { key: string; name: string; named: boolean; logs: Log[]; lat: string; lon: string; last: Log; memo: string };
 
-const APP_VERSION = "2026.11.08-d";
+const APP_VERSION = "2026.11.08-e";
 const KEY = "seeker_data_v2";
 const uid = () => Date.now().toString(36) + Math.random().toString(36).slice(2, 6);
 const ym = (iso: string) => { const d = new Date(iso); return `${d.getFullYear()}-${d.getMonth() + 1}`; };
@@ -70,31 +70,6 @@ function buildPlaces(logs: Log[]): Place[] {
   }).sort((a, b) => b.last.at.localeCompare(a.last.at));
 }
 
-// ブランドの印：天（龍）・地（穂）・人（千の鈴）を、風の線でつなぐ
-function Mark({ width = 180 }: { width?: number }) {
-  return (
-    <svg viewBox="0 12 300 96" width={width} aria-hidden="true" className="mx-auto block">
-      <path d="M8 88 C 40 62, 70 112, 100 88 S 160 62, 192 88 S 252 112, 292 84" fill="none" stroke="#9ec7d6" strokeWidth="2" />
-      <path d="M8 98 C 40 72, 70 122, 100 98 S 160 72, 192 98 S 252 122, 292 94" fill="none" stroke="#cfe3ea" strokeWidth="1.2" />
-      <g fill="none" stroke="#6aa6bf" strokeWidth="2.2" strokeLinecap="round">
-        <path d="M30 62 C 26 40, 56 26, 64 44 C 70 58, 48 64, 46 52 C 45 44, 55 42, 58 48" />
-        <path d="M30 62 C 24 66, 20 70, 16 76" />
-      </g>
-      <path d="M150 74 C 150 60, 152 48, 157 28" fill="none" stroke="#c9a77c" strokeWidth="2.2" strokeLinecap="round" />
-      <g fill="#ecdcb4" stroke="#c9a77c" strokeWidth="1.2">
-        {[[145, 64, -32], [156, 59, 32], [146, 52, -32], [158, 47, 32], [149, 40, -32], [160, 35, 32]].map(([x, y, r], i) => (
-          <ellipse key={i} cx={x} cy={y} rx="3.4" ry="7" transform={`rotate(${r} ${x} ${y})`} />
-        ))}
-        <ellipse cx="158" cy="24" rx="3.2" ry="6.5" transform="rotate(8 158 24)" />
-      </g>
-      <circle cx="250" cy="28" r="3.4" fill="none" stroke="#e29a86" strokeWidth="1.6" />
-      <path d="M238 66 C 238 46, 245 33, 250 33 C 255 33, 262 46, 262 66 Z" fill="#fff" stroke="#e29a86" strokeWidth="2" />
-      <path d="M234 66 L266 66" stroke="#e29a86" strokeWidth="2" strokeLinecap="round" />
-      <circle cx="250" cy="71" r="3.4" fill="#e29a86" />
-      <path d="M270 44 q7 10 0 20 M277 38 q11 16 0 32 M230 44 q-7 10 0 20 M223 38 q-11 16 0 32" fill="none" stroke="#e29a86" strokeWidth="1.2" strokeOpacity="0.55" strokeLinecap="round" />
-    </svg>
-  );
-}
 function WindBg() {
   return (
     <svg viewBox="0 0 340 120" preserveAspectRatio="none" width="100%" height="130" className="absolute top-0 left-0" aria-hidden="true">
@@ -385,22 +360,22 @@ export default function SeekerApp() {
   return (
     <div style={{ fontFamily: '"Hiragino Mincho ProN","Yu Mincho","Noto Serif JP",serif' }} className="min-h-screen bg-[#eef5f6] text-[#2d3a40] antialiased">
       <div className="max-w-md mx-auto p-5 pb-28">
-        <div className="relative text-center pb-5">
+        <div className="relative pb-4">
           <WindBg />
-          <div className="relative pt-1">
-            <Mark width={190} />
-            <h1 className="text-xl font-medium tracking-[0.3em] mt-1 mr-[-0.3em]">ニライの手帖</h1>
-            <p className="text-[11px] text-[#5f7078] mt-1 tracking-[0.2em]">天・地・人を風がつなぐ</p>
-            <div className="mt-3 flex items-center justify-center gap-2.5 text-center">
-              <span className="h-px w-7 bg-[#c9a77c]/70" />
-              <div className="leading-tight">
-                <p className="text-[9px] italic tracking-[0.35em] text-[#8a99a0]">Presented by</p>
-                <p className="text-[11px] tracking-[0.3em] mr-[-0.3em] text-[#5f7078]">波動調整師　千鈴龍穂</p>
-              </div>
-              <span className="h-px w-7 bg-[#c9a77c]/70" />
+          <div className="relative flex items-start justify-between gap-3 pt-2">
+            <div className="pt-4">
+              <h1 className="text-xl font-medium tracking-[0.25em]">ニライの手帖</h1>
+              <p className="text-[11px] text-[#5f7078] mt-2 tracking-[0.15em]">天・地・人を風がつなぐ</p>
+            </div>
+            <div className="shrink-0 text-center">
+              <p className="text-[9px] italic tracking-[0.25em] text-[#8a99a0]">Presented by</p>
+              <p className="text-[10px] tracking-[0.3em] mr-[-0.3em] text-[#5f7078] mb-1">波動調整師</p>
+              <img src="/logo.png" alt="波動調整師 千鈴龍穂 SENRI TATSUHO" width={96} className="block mx-auto" />
             </div>
           </div>
+          <div className="relative mt-4 h-px bg-[#d5e3e7]" />
         </div>
+
 
         {/* ===== 刻む ===== */}
         {tab === "vibe" && (
@@ -746,7 +721,7 @@ export default function SeekerApp() {
         {tab === "data" && (
           <div className="space-y-4 text-xs">
             <div className={`${card} p-4 space-y-3`}>
-              <Mark width={170} />
+              <img src="/logo.png" alt="波動調整師 千鈴龍穂 SENRI TATSUHO" width={120} className="block mx-auto" />
               <p className="font-bold text-sm text-center tracking-[0.2em]">天・地・人をつなぐ</p>
               <div className="grid grid-cols-3 gap-2 text-center text-[11px]">
                 <div><p className="text-[#6aa6bf] font-bold text-sm">天</p><p>龍</p></div>
@@ -754,7 +729,7 @@ export default function SeekerApp() {
                 <div><p className="text-[#e29a86] font-bold text-sm">人</p><p>千の鈴</p></div>
               </div>
               <p className="text-[#5f7078] leading-relaxed">ひとりひとりの鈴の音が、天と地をつなぐ。天地人のように、天と地、海、植物、鉱物、岩などの自然をつなぐ役割として、日々の波動調整を刻む手帖です。</p>
-              <p className="text-[10px] text-[#8a99a0] text-center tracking-widest">Presented by 波動調整師 千鈴龍穂（senritatuho）</p>
+              <p className="text-[10px] text-[#8a99a0] text-center tracking-widest">Presented by 波動調整師 千鈴龍穂</p>
             </div>
             <div className={`${card} p-4 space-y-3`}>
               <p className="font-bold">お守りを作る</p>
