@@ -9,7 +9,7 @@ type Trip = { id: string; title: string; start: string; end: string; notes: stri
 type Fav = { id: string; name: string; category: string; area: string; memo: string; loc?: string };
 type Place = { key: string; name: string; named: boolean; logs: Log[]; lat: string; lon: string; last: Log; memo: string };
 
-const APP_VERSION = "2026.11.08-e";
+const APP_VERSION = "2026.11.12-a";
 const KEY = "seeker_data_v2";
 const uid = () => Date.now().toString(36) + Math.random().toString(36).slice(2, 6);
 const ym = (iso: string) => { const d = new Date(iso); return `${d.getFullYear()}-${d.getMonth() + 1}`; };
@@ -721,7 +721,7 @@ export default function SeekerApp() {
         {tab === "data" && (
           <div className="space-y-4 text-xs">
             <div className={`${card} p-4 space-y-3`}>
-              <img src="/logo.png" alt="波動調整師 千鈴龍穂 SENRI TATSUHO" width={120} className="block mx-auto" />
+              <img src="/logo.png" alt="波動調整師 千鈴龍穂 SENRI TATSUHO" width={200} className="block mx-auto" />
               <p className="font-bold text-sm text-center tracking-[0.2em]">天・地・人をつなぐ</p>
               <div className="grid grid-cols-3 gap-2 text-center text-[11px]">
                 <div><p className="text-[#6aa6bf] font-bold text-sm">天</p><p>龍</p></div>
