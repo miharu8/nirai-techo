@@ -9,7 +9,7 @@ type Trip = { id: string; title: string; start: string; end: string; notes: stri
 type Fav = { id: string; name: string; category: string; area: string; memo: string; loc?: string };
 type Place = { key: string; name: string; named: boolean; logs: Log[]; lat: string; lon: string; last: Log; memo: string };
 
-const APP_VERSION = "2026.11.12-a";
+const APP_VERSION = "2026.11.12-b";
 const KEY = "seeker_data_v2";
 const uid = () => Date.now().toString(36) + Math.random().toString(36).slice(2, 6);
 const ym = (iso: string) => { const d = new Date(iso); return `${d.getFullYear()}-${d.getMonth() + 1}`; };
@@ -367,11 +367,13 @@ export default function SeekerApp() {
               <h1 className="text-xl font-medium tracking-[0.25em]">ニライの手帖</h1>
               <p className="text-[11px] text-[#5f7078] mt-2 tracking-[0.15em]">天・地・人を風がつなぐ</p>
             </div>
+            {tab !== "data" && (
             <div className="shrink-0 text-center">
               <p className="text-[9px] italic tracking-[0.25em] text-[#8a99a0]">Presented by</p>
               <p className="text-[10px] tracking-[0.3em] mr-[-0.3em] text-[#5f7078] mb-1">波動調整師</p>
               <img src="/logo.png" alt="波動調整師 千鈴龍穂 SENRI TATSUHO" width={96} className="block mx-auto" />
             </div>
+          )}
           </div>
           <div className="relative mt-4 h-px bg-[#d5e3e7]" />
         </div>
