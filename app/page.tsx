@@ -9,7 +9,7 @@ type Trip = { id: string; title: string; start: string; end: string; notes: stri
 type Fav = { id: string; name: string; category: string; area: string; memo: string; loc?: string };
 type Place = { key: string; name: string; named: boolean; logs: Log[]; lat: string; lon: string; last: Log; memo: string };
 
-const APP_VERSION = "2026.11.12-b";
+const APP_VERSION = "2026.11.12-c";
 const KEY = "seeker_data_v2";
 const uid = () => Date.now().toString(36) + Math.random().toString(36).slice(2, 6);
 const ym = (iso: string) => { const d = new Date(iso); return `${d.getFullYear()}-${d.getMonth() + 1}`; };
@@ -81,21 +81,172 @@ function WindBg() {
 }
 
 // 地図：波動1〜5を空色の濃淡で表示。丸＝土地、角丸の四角＝ご縁。線は刻んだ順。
+
+const PRIMARY = "bg-[#2f6584] rounded-xl text-xs font-bold text-white";
+type Loc = { lat: string; lon: string } | null;
+
+// 地図ライブラリ（Leaflet）を一度だけ読み込む
+let leafletP: Promise<any> | null = null;
+function loadLeaflet(): Promise<any> {
+  if ((window as any).L) return Promise.resolve((window as any).L);
+  if (!leafletP) leafletP = new Promise((res) => {
+    const css = document.createElement("link");
+    css.rel = "stylesheet"; css.href = "https://unpkg.com/leaflet@1.9.4/dist/leaflet.css";
+    document.head.appendChild(css);
+    const js = document.createElement("script");
+    js.src = "https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"; js.onload = () => res((window as any).L);
+    document.body.appendChild(js);
+  });
+  return leafletP;
+}
+
+// 場所の位置を選ぶ部品：名前で探す／地図をタップ／いまの場所
+function LocPicker({ value, onChange, start }: { value: Loc; onChange: (v: Loc) => void; start?: [number, number] }) {
+  const ref = useRef<HTMLDivElement>(null);
+  const mapRef = useRef<any>(null);
+  const markRef = useRef<any>(null);
+  const cb = useRef(onChange); cb.current = onChange;
+  const [ready, setReady] = useState(false);
+  const [q, setQ] = useState("");
+  const [results, setResults] = useState<{ name: string; lat: string; lon: string }[]>([]);
+  const [busy, setBusy] = useState("");
+
+  useEffect(() => {
+    let alive = true;
+    loadLeaflet().then((L) => {
+      if (!alive || !ref.current || mapRef.current) return;
+      const c: [number, number] = value ? [Number(value.lat), Number(value.lon)] : start ?? [26.4, 127.9];
+      const map = L.map(ref.current).setView(c, value ? 14 : start ? 11 : 9);
+      L.tileLayer("https://tile.openstreetmap.org/{z}/{x}/{y}.png", { maxZoom: 19, attribution: "© OpenStreetMap" }).addTo(map);
+      map.on("click", (e: any) => cb.current({ lat: e.latlng.lat.toFixed(5), lon: e.latlng.lng.toFixed(5) }));
+      mapRef.current = map; setReady(true);
+    });
+    return () => { alive = false; if (mapRef.current) { mapRef.current.remove(); mapRef.current = null; markRef.current = null; } };
+  }, []);
+
+  useEffect(() => {
+    const L = (window as any).L, map = mapRef.current;
+    if (!ready || !L || !map) return;
+    if (markRef.current) { markRef.current.remove(); markRef.current = null; }
+    if (value) {
+      const ll: [number, number] = [Number(value.lat), Number(value.lon)];
+      markRef.current = L.circleMarker(ll, { radius: 10, color: "#ffffff", weight: 3, fillColor: "#2f6584", fillOpacity: 1 }).addTo(map);
+      map.setView(ll, Math.max(map.getZoom(), 14));
+    }
+  }, [value?.lat, value?.lon, ready]);
+
+  const search = async () => {
+    if (!q.trim()) return;
+    setBusy("さがしています…"); setResults([]);
+    try {
+      const r = await fetch(`https://nominatim.openstreetmap.org/search?format=jsonv2&limit=5&accept-language=ja&q=${encodeURIComponent(q.trim())}`);
+      const j = await r.json();
+      setResults(j.map((x: any) => ({ name: String(x.display_name), lat: Number(x.lat).toFixed(5), lon: Number(x.lon).toFixed(5) })));
+      setBusy(j.length ? "" : "見つかりませんでした。地図をタップして選べます");
+    } catch { setBusy("検索できませんでした（電波をご確認ください）。地図をタップして選べます"); }
+  };
+  const here = () => {
+    if (!navigator.geolocation) return setBusy("位置情報が使えません");
+    setBusy("場所を探しています…");
+    navigator.geolocation.getCurrentPosition(
+      (pos) => { onChange({ lat: pos.coords.latitude.toFixed(5), lon: pos.coords.longitude.toFixed(5) }); setBusy(""); },
+      () => setBusy("現在地を取得できませんでした"), { timeout: 10000 });
+  };
+
+  return (
+    <div className="space-y-2">
+      <div className="flex gap-2">
+        <input className={inp} placeholder="名前で探す（例：斎場御嶽）" value={q} onChange={(e) => setQ(e.target.value)} onKeyDown={(e) => e.key === "Enter" && search()} />
+        <button onClick={search} className={`px-4 shrink-0 ${PRIMARY}`}>探す</button>
+      </div>
+      {busy && <p className="text-[11px] text-[#5f7078]">{busy}</p>}
+      {results.map((r) => (
+        <button key={r.lat + r.lon + r.name} onClick={() => { onChange({ lat: r.lat, lon: r.lon }); setResults([]); setBusy(""); }} className="block w-full text-left text-[11px] p-2 rounded-lg bg-[#e3eff2] text-[#2d3a40]">{r.name}</button>
+      ))}
+      <div ref={ref} className="isolate relative z-0 h-52 w-full rounded-xl border border-[#d5e3e7]" />
+      <p className="text-[11px] text-[#5f7078]">{value ? `選んだ位置：${value.lat}, ${value.lon}` : "地図をタップして場所を選べます（選ばなくても保存できます）"}</p>
+      <div className="flex gap-4 text-[11px] text-[#2f6584]">
+        <button className="underline" onClick={here}>いまの場所を使う</button>
+        {value && <button className="underline" onClick={() => onChange(null)}>位置を消す</button>}
+      </div>
+    </div>
+  );
+}
+
+// 保存し忘れた場所を、あとから記録する
+function PastForm({ places, placeNames, onAdd, flash }: { places: Place[]; placeNames: string[]; onAdd: (l: Log) => void; flash: (t: string) => void }) {
+  const [open, setOpen] = useState(false);
+  const [at, setAt] = useState("");
+  const [type, setType] = useState<"land" | "work">("land");
+  const [score, setScore] = useState(3);
+  const [place, setPlace] = useState("");
+  const [pmemo, setPmemo] = useState("");
+  const [memo, setMemo] = useState("");
+  const [client, setClient] = useState("");
+  const [fee, setFee] = useState("");
+  const [loc, setLoc] = useState<Loc>(null);
+  const known = places.find((p) => p.named && p.name === place.trim());
+  const shownLoc: Loc = loc ?? (known ? { lat: known.lat, lon: known.lon } : null);
+  const start: [number, number] | undefined = places[0] ? [Number(places[0].lat), Number(places[0].lon)] : undefined;
+  const tg = (on: boolean) => `py-2.5 rounded-xl text-xs font-medium border ${on ? "bg-[#e0eef3] border-[#6aa6bf] text-[#2f6584]" : "bg-white border-[#d5e3e7] text-[#5f7078]"}`;
+
+  const submit = () => {
+    if (!at) return flash("いつの記録か、日時を入れてください");
+    onAdd({
+      id: uid(), at: new Date(at).toISOString(), lat: shownLoc?.lat, lon: shownLoc?.lon, type, score, memo: memo.trim(),
+      client: type === "work" ? client.trim() : "", fee: type === "work" ? Number(fee) || 0 : 0,
+      place: place.trim(), pmemo: place.trim() ? pmemo.trim() : "",
+    });
+    setPlace(""); setPmemo(""); setMemo(""); setClient(""); setFee(""); setLoc(null); setOpen(false);
+    flash("あとから記録しました");
+  };
+
+  if (!open) return <button onClick={() => { setAt(toLocalInput(new Date().toISOString())); setOpen(true); }} className="w-full py-2.5 rounded-xl border border-dashed border-[#2f6584] text-xs text-[#2f6584]">＋ 保存し忘れた場所を、あとから記録する</button>;
+  return (
+    <div className={`${card} p-3 space-y-2.5`}>
+      <p className="text-xs font-bold text-[#2f6584]">あとから記録する</p>
+      <label className="block text-[10px] text-[#5f7078]">いつ行きましたか
+        <input type="datetime-local" className={`${inp} mt-1 appearance-none`} value={at} onChange={(e) => setAt(e.target.value)} />
+      </label>
+      <div className="grid grid-cols-2 gap-2">
+        <button onClick={() => setType("land")} className={tg(type === "land")}>土地との対話</button>
+        <button onClick={() => setType("work")} className={tg(type === "work")}>ご縁のセッション</button>
+      </div>
+      <input className={inp} list="placeNames" placeholder="場所の名前（例：斎場御嶽）" value={place} onChange={(e) => setPlace(e.target.value)} />
+      {place.trim() && <input className={inp} placeholder="場所メモ（行き方・駐車場・入口など）" value={pmemo} onChange={(e) => setPmemo(e.target.value)} />}
+      <p className="text-[11px] text-[#5f7078]">そのときの波動は？</p>
+      <div className="flex gap-2">
+        {[1, 2, 3, 4, 5].map((n) => (
+          <button key={n} onClick={() => setScore(n)} style={lvStyle(n, score === n)} className={`flex-1 py-2 rounded-xl ${score === n ? "shadow" : "bg-white border border-[#d5e3e7] text-[#5f7078]"}`}>
+            <span className="block text-sm font-bold leading-none">{n}</span><span className="block text-[9px] mt-0.5">{LEVELS[n - 1]}</span>
+          </button>
+        ))}
+      </div>
+      {type === "work" && (
+        <div className="grid grid-cols-2 gap-2">
+          <input className={inp} placeholder="お客様のお名前" value={client} onChange={(e) => setClient(e.target.value)} />
+          <input className={inp} placeholder="料金（円）" inputMode="numeric" value={fee} onChange={(e) => setFee(e.target.value.replace(/\D/g, ""))} />
+        </div>
+      )}
+      <textarea className={`${inp} h-16 resize-none`} placeholder="感じたこと、気づき…" value={memo} onChange={(e) => setMemo(e.target.value)} />
+      <p className="text-[11px] font-bold text-[#2f6584]">場所の位置（地図で見返す・また行くために）</p>
+      {known && !loc && <p className="text-[10px] text-[#2f6584]">「{known.name}」で前に記録した位置を使います。変えたいときは、下で選び直してください。</p>}
+      <LocPicker value={shownLoc} onChange={setLoc} start={start} />
+      <div className="grid grid-cols-2 gap-2">
+        <button onClick={submit} className={`py-2.5 ${PRIMARY}`}>この内容で記録する</button>
+        <button onClick={() => setOpen(false)} className="py-2.5 rounded-xl border border-[#d5e3e7] text-xs text-[#5f7078]">やめる</button>
+      </div>
+    </div>
+  );
+}
+
 function MapView({ logs }: { logs: Log[] }) {
   const ref = useRef<HTMLDivElement>(null);
   const [filter, setFilter] = useState<"all" | "land" | "work">("all");
   const [ready, setReady] = useState(false);
   const pts = logs.filter((l) => l.lat && (filter === "all" || l.type === filter)).slice().reverse();
 
-  useEffect(() => {
-    if ((window as any).L) { setReady(true); return; }
-    const css = document.createElement("link");
-    css.rel = "stylesheet"; css.href = "https://unpkg.com/leaflet@1.9.4/dist/leaflet.css";
-    document.head.appendChild(css);
-    const js = document.createElement("script");
-    js.src = "https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"; js.onload = () => setReady(true);
-    document.body.appendChild(js);
-  }, []);
+  useEffect(() => { loadLeaflet().then(() => setReady(true)); }, []);
 
   useEffect(() => {
     const L = (window as any).L;
@@ -162,6 +313,7 @@ export default function SeekerApp() {
   ]);
   const [msg, setMsg] = useState("");
   const [editLogId, setEditLogId] = useState("");
+  const [editLocId, setEditLocId] = useState("");
   const [editPlanId, setEditPlanId] = useState("");
   const [editItemId, setEditItemId] = useState("");
   const [editFavId, setEditFavId] = useState("");
@@ -350,6 +502,8 @@ export default function SeekerApp() {
     r.readAsText(file);
   };
 
+  const placesAll = buildPlaces(logs);
+  const startPos: [number, number] | undefined = placesAll[0] ? [Number(placesAll[0].lat), Number(placesAll[0].lon)] : undefined;
   const tabs = [["vibe", "刻む"], ["prepare", "旅支度"], ["map", "道標"], ["favorites", "とっておき"], ["data", "お守り"]] as const;
   const btn = (on: boolean) => `py-3 rounded-xl text-xs font-medium border transition-all ${on ? "bg-[#e0eef3] border-[#6aa6bf] text-[#2f6584]" : "bg-white border-[#d5e3e7] text-[#5f7078]"}`;
   const chip = (on: boolean) => `shrink-0 px-3 py-1.5 rounded-lg text-[11px] border ${on ? "bg-[#2f6584] border-[#2f6584] text-white" : "bg-white border-[#d5e3e7] text-[#5f7078]"}`;
@@ -406,6 +560,7 @@ export default function SeekerApp() {
             )}
             <textarea className={`${inp} h-20 resize-none`} placeholder="感じたこと、風や香り、気づき…" value={memo} onChange={(e) => setMemo(e.target.value)} />
             <button onClick={handleLog} className="w-full py-4 bg-[#2f6584] rounded-xl font-medium tracking-widest text-sm text-white">この場の波動を刻む</button>
+            <PastForm places={placesAll} placeNames={placeNames} flash={flash} onAdd={(l) => setLogs((p) => [l, ...p].sort((a, b) => b.at.localeCompare(a.at)))} />
 
             {monthWork.length > 0 && (
               <div className={`${card} p-3 text-xs flex justify-between`}>
@@ -446,6 +601,8 @@ export default function SeekerApp() {
                         </div>
                       )}
                       <input type="datetime-local" className={`${inp} appearance-none`} value={toLocalInput(l.at)} onChange={(e) => e.target.value && updateLog(l.id, { at: new Date(e.target.value).toISOString() })} />
+                      <button onClick={() => setEditLocId(editLocId === l.id ? "" : l.id)} className="text-[11px] text-[#2f6584] underline">{editLocId === l.id ? "位置の指定を閉じる" : l.lat ? "位置を変える" : "位置を指定する（地図に出せます）"}</button>
+                      {editLocId === l.id && <LocPicker value={l.lat ? { lat: l.lat, lon: l.lon! } : null} onChange={(v) => updateLog(l.id, { lat: v?.lat, lon: v?.lon })} start={startPos} />}
                       <textarea className={`${inp} h-20 resize-none`} value={l.memo} onChange={(e) => updateLog(l.id, { memo: e.target.value })} />
                       <button onClick={() => setEditLogId("")} className={`w-full py-2 ${primary}`}>完了</button>
                     </div>
